@@ -52,3 +52,12 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Node
+node_modules/
+frontend/node_modules/
+back/node_modules/
+
+# .NET carpetas específicas SubastasApi
+back/SubastasApi/bin/
+back/SubastasApi/obj/
