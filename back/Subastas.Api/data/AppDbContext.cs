@@ -23,6 +23,7 @@ public class AppDbContext : DbContext
         {
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.Email).HasColumnName("email");
+            e.Property(x => x.Nickname).HasColumnName("nickname");
             e.Property(x => x.PasswordHash).HasColumnName("password_hash");
             e.Property(x => x.Role).HasColumnName("role");
             e.Property(x => x.IsAdmin).HasColumnName("is_admin");

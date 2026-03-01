@@ -1,6 +1,14 @@
 <template>
   <Form class="space-y-4" :initial-values="initialValues" @submit="onSubmit">
     <div>
+      <label class="mb-1 block text-sm">Nick / Apodo</label>
+      <Field name="nickname" rules="required|min:3|max:30|alpha_dash" v-slot="{ field, errorMessage }">
+        <input v-bind="field" type="text" class="w-full rounded-md border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900" />
+        <p class="mt-1 text-xs text-red-500">{{ errorMessage }}</p>
+      </Field>
+    </div>
+
+    <div>
       <label class="mb-1 block text-sm">{{ $t('auth.email') }}</label>
       <Field name="email" rules="required|email" v-slot="{ field, errorMessage }">
         <input v-bind="field" type="email" class="w-full rounded-md border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900" />
@@ -44,6 +52,7 @@ const props = defineProps<{ isLoading?: boolean; modelValue?: User | null }>()
 const emit = defineEmits<{ submit: [any]; cancel: [] }>()
 
 const initialValues = computed(() => ({
+  nickname: props.modelValue?.nickname ?? '',
   email: props.modelValue?.email ?? '',
   password: '',
   role: props.modelValue?.role ?? 'USER',

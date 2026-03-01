@@ -1,5 +1,6 @@
 <template>
   <el-table :data="users" stripe border>
+    <el-table-column prop="nickname" label="Apodo" min-width="160" />
     <el-table-column prop="email" :label="$t('auth.email')" min-width="220" />
     <el-table-column prop="role" :label="$t('users.role')" width="130" />
     <el-table-column :label="$t('users.created_at')" width="180">

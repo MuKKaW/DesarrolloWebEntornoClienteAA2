@@ -1,6 +1,14 @@
 <template>
   <Form class="space-y-4" @submit="onSubmit">
     <div>
+      <label class="mb-1 block text-sm text-slate-200">Nick / Apodo</label>
+      <Field name="nickname" rules="required|min:3|max:30|alpha_dash" v-slot="{ field, errorMessage }">
+        <input v-bind="field" type="text" class="w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-slate-100" />
+        <p class="mt-1 text-xs text-red-400">{{ errorMessage }}</p>
+      </Field>
+    </div>
+
+    <div>
       <label class="mb-1 block text-sm text-slate-200">{{ $t('auth.email') }}</label>
       <Field name="email" rules="required|email" v-slot="{ field, errorMessage }">
         <input v-bind="field" type="email" class="w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-slate-100" />
@@ -35,9 +43,9 @@ import { Form, Field } from 'vee-validate'
 
 defineProps<{ isLoading?: boolean }>()
 
-const emit = defineEmits<{ submit: [{ email: string; password: string }] }>()
+const emit = defineEmits<{ submit: [{ email: string; password: string; nickname: string }] }>()
 
 const onSubmit = (values: any) => {
-  emit('submit', { email: values.email, password: values.password })
+  emit('submit', { email: values.email, password: values.password, nickname: values.nickname })
 }
 </script>

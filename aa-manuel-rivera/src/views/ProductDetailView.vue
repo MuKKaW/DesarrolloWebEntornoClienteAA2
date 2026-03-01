@@ -30,7 +30,7 @@
           <div class="mt-4 space-y-3">
             <el-input v-model.number="bidAmount" type="number" :disabled="!canBid" step="0.01" />
             <el-button type="primary" :disabled="!canBid" :loading="bidStore.loading" @click="placeBid">Pujar</el-button>
-            <el-button v-if="!authStore.isAuthenticated" @click="uiStore.openAuthModal('login')">Entrar</el-button>
+            <el-button v-if="!authStore.isAuthenticated" @click="router.push('/login')">Entrar</el-button>
             <p v-if="bidError" class="text-sm text-red-500">{{ bidError }}</p>
           </div>
         </el-card>
@@ -56,14 +56,12 @@ import BidTable from '@/components/BidTable.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useBidStore } from '@/stores/bids'
 import { useProductStore } from '@/stores/products'
-import { useUiStore } from '@/stores/ui'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const productStore = useProductStore()
 const bidStore = useBidStore()
-const uiStore = useUiStore()
 
 const bidAmount = ref<number>(0)
 const bidError = ref('')

@@ -2,12 +2,14 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
+using System.Data.Common;
 using Subastas.Api.Data;
 using Subastas.Api.Models;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Text;
+using System.Text.RegularExpressions;
 
 var builder = WebApplication.CreateBuilder(args);
 const string JwtIssuer = "Subastas.Api";
@@ -84,16 +86,22 @@ using (var scope = app.Services.CreateScope())
         await connection.OpenAsync();
 
     await using var command = connection.CreateCommand();
-    command.CommandText = """
-        SELECT COUNT(*)
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = 'users'
-          AND COLUMN_NAME = 'is_admin'
-        """;
+    static async Task<bool> HasColumnAsync(DbCommand command, string columnName)
+    {
+        command.CommandText = $"""
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'users'
+              AND COLUMN_NAME = '{columnName}'
+            """;
 
-    var result = await command.ExecuteScalarAsync();
-    var hasIsAdminColumn = Convert.ToInt32(result) > 0;
+        var result = await command.ExecuteScalarAsync();
+        return Convert.ToInt32(result) > 0;
+    }
+
+    var hasIsAdminColumn = await HasColumnAsync(command, "is_admin");
+    var hasNicknameColumn = await HasColumnAsync(command, "nickname");
 
     if (!hasIsAdminColumn)
     {
@@ -103,10 +111,24 @@ using (var scope = app.Services.CreateScope())
             """);
     }
 
+    if (!hasNicknameColumn)
+    {
+        await db.Database.ExecuteSqlRawAsync("""
+            ALTER TABLE users
+            ADD COLUMN nickname VARCHAR(80) NOT NULL DEFAULT '';
+            """);
+    }
+
     await db.Database.ExecuteSqlRawAsync("""
         UPDATE users
         SET is_admin = CASE WHEN role = 'ADMIN' THEN TRUE ELSE FALSE END
         WHERE is_admin <> CASE WHEN role = 'ADMIN' THEN TRUE ELSE FALSE END;
+        """);
+
+    await db.Database.ExecuteSqlRawAsync("""
+        UPDATE users
+        SET nickname = SUBSTRING_INDEX(email, '@', 1)
+        WHERE nickname IS NULL OR nickname = '';
         """);
 
     await SeedDefaultDataAsync(db);
@@ -120,10 +142,10 @@ app.MapPost("/api/auth/login", async (LoginRequest req, AppDbContext db) =>
 {
     var normalizedEmail = req.Email.Trim().ToLowerInvariant();
     var user = await db.Users.FirstOrDefaultAsync(u => u.Email == normalizedEmail);
-    if (user is null) return Results.Json(new { message = "Credenciales invalidas" }, statusCode: StatusCodes.Status401Unauthorized);
+    if (user is null) return Results.Json(new { message = "No existe ningun usuario con ese correo" }, statusCode: StatusCodes.Status401Unauthorized);
 
     var passwordValid = BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash);
-    if (!passwordValid) return Results.Json(new { message = "Credenciales invalidas" }, statusCode: StatusCodes.Status401Unauthorized);
+    if (!passwordValid) return Results.Json(new { message = "La contrasena es incorrecta" }, statusCode: StatusCodes.Status401Unauthorized);
 
     var token = GenerateToken(user);
     return Results.Ok(new { token, user = ToUserResponse(user) });
@@ -132,16 +154,23 @@ app.MapPost("/api/auth/login", async (LoginRequest req, AppDbContext db) =>
 app.MapPost("/api/auth/register", async (RegisterRequest req, AppDbContext db) =>
 {
     var normalizedEmail = req.Email.Trim().ToLowerInvariant();
+    var normalizedNickname = NormalizeNickname(req.Nickname);
     if (req.Password.Length < 6)
         return Results.BadRequest(new { message = "La contrasena debe tener al menos 6 caracteres" });
+    var nicknameValidationError = ValidateNickname(normalizedNickname);
+    if (nicknameValidationError is not null)
+        return Results.BadRequest(new { message = nicknameValidationError });
 
     var existingUser = await db.Users.FirstOrDefaultAsync(u => u.Email == normalizedEmail);
     if (existingUser is not null) return Results.BadRequest(new { message = "Email ya registrado" });
+    var existingNickname = await db.Users.FirstOrDefaultAsync(u => u.Nickname.ToLower() == normalizedNickname.ToLower());
+    if (existingNickname is not null) return Results.BadRequest(new { message = "Ese apodo ya esta en uso" });
 
     var hashedPassword = BCrypt.Net.BCrypt.HashPassword(req.Password);
     var newUser = new User
     {
         Email = normalizedEmail,
+        Nickname = normalizedNickname,
         PasswordHash = hashedPassword,
         Role = "USER",
         IsAdmin = false
@@ -179,6 +208,26 @@ app.MapGet("/api/products", async (AppDbContext db, int page = 1, int pageSize =
         .OrderByDescending(p => p.Id)
         .Skip((page - 1) * pageSize)
         .Take(pageSize)
+        .Select(p => new
+        {
+            p.Id,
+            p.CreatedBy,
+            p.Title,
+            p.Description,
+            p.StartPrice,
+            p.CurrentPrice,
+            p.StartsAt,
+            p.EndsAt,
+            p.Status,
+            p.CreatedAt,
+            createdByNickname = p.CreatedByUser != null ? p.CreatedByUser.Nickname : null,
+            lastBidNickname = db.Bids
+                .Where(b => b.ProductId == p.Id)
+                .OrderByDescending(b => b.Amount)
+                .ThenByDescending(b => b.CreatedAt)
+                .Select(b => b.User != null ? b.User.Nickname : null)
+                .FirstOrDefault()
+        })
         .ToListAsync();
 
     return Results.Ok(new { items = products, total, page, pageSize });
@@ -186,18 +235,50 @@ app.MapGet("/api/products", async (AppDbContext db, int page = 1, int pageSize =
 
 app.MapGet("/api/products/{id:long}", async (long id, AppDbContext db) =>
 {
-    var p = await db.Products.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+    var p = await db.Products
+        .AsNoTracking()
+        .Where(x => x.Id == id)
+        .Select(product => new
+        {
+            product.Id,
+            product.CreatedBy,
+            product.Title,
+            product.Description,
+            product.StartPrice,
+            product.CurrentPrice,
+            product.StartsAt,
+            product.EndsAt,
+            product.Status,
+            product.CreatedAt,
+            createdByNickname = product.CreatedByUser != null ? product.CreatedByUser.Nickname : null,
+            lastBidNickname = db.Bids
+                .Where(b => b.ProductId == product.Id)
+                .OrderByDescending(b => b.Amount)
+                .ThenByDescending(b => b.CreatedAt)
+                .Select(b => b.User != null ? b.User.Nickname : null)
+                .FirstOrDefault()
+        })
+        .FirstOrDefaultAsync();
     return p is null ? Results.NotFound() : Results.Ok(p);
 });
 
-app.MapPost("/api/products", async (Product input, AppDbContext db) =>
+app.MapPost("/api/products", async (Product input, ClaimsPrincipal principal, AppDbContext db) =>
 {
+    var authenticatedUserId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!long.TryParse(authenticatedUserId, out var createdByUserId))
+        return Results.Json(new { message = "Tu sesion ya no es valida. Vuelve a iniciar sesion." }, statusCode: StatusCodes.Status401Unauthorized);
+
+    var creatorExists = await db.Users.AnyAsync(u => u.Id == createdByUserId);
+    if (!creatorExists)
+        return Results.Json(new { message = "Tu sesion ya no es valida. Vuelve a iniciar sesion." }, statusCode: StatusCodes.Status401Unauthorized);
+
     if (input.CurrentPrice <= 0) input.CurrentPrice = input.StartPrice;
+    input.CreatedBy = createdByUserId;
 
     db.Products.Add(input);
     await db.SaveChangesAsync();
     return Results.Created($"/api/products/{input.Id}", input);
-});
+}).RequireAuthorization();
 
 app.MapPut("/api/products/{id:long}", async (long id, Product input, AppDbContext db) =>
 {
@@ -264,14 +345,21 @@ app.MapGet("/api/users/{id:long}", async (long id, AppDbContext db) =>
 app.MapPost("/api/users", async (CreateUserRequest req, AppDbContext db) =>
 {
     var normalizedEmail = req.Email.Trim().ToLowerInvariant();
+    var normalizedNickname = NormalizeNickname(req.Nickname);
     var existing = await db.Users.FirstOrDefaultAsync(u => u.Email == normalizedEmail);
     if (existing is not null) return Results.BadRequest(new { message = "Email ya existe" });
+    var nicknameValidationError = ValidateNickname(normalizedNickname);
+    if (nicknameValidationError is not null)
+        return Results.BadRequest(new { message = nicknameValidationError });
+    var existingNickname = await db.Users.FirstOrDefaultAsync(u => u.Nickname.ToLower() == normalizedNickname.ToLower());
+    if (existingNickname is not null) return Results.BadRequest(new { message = "Ese apodo ya esta en uso" });
 
     var hashedPassword = BCrypt.Net.BCrypt.HashPassword(req.Password);
     var isAdmin = req.IsAdmin ?? string.Equals(req.Role, "ADMIN", StringComparison.OrdinalIgnoreCase);
     var user = new User
     {
         Email = normalizedEmail,
+        Nickname = normalizedNickname,
         PasswordHash = hashedPassword,
         Role = isAdmin ? "ADMIN" : req.Role,
         IsAdmin = isAdmin
@@ -289,6 +377,15 @@ app.MapPut("/api/users/{id:long}", async (long id, UpdateUserRequest input, AppD
 
     if (!string.IsNullOrEmpty(input.Email))
         existing.Email = input.Email.Trim().ToLowerInvariant();
+    if (!string.IsNullOrWhiteSpace(input.Nickname))
+    {
+        var normalizedNickname = NormalizeNickname(input.Nickname);
+        var nicknameValidationError = ValidateNickname(normalizedNickname);
+        if (nicknameValidationError is not null) return Results.BadRequest(new { message = nicknameValidationError });
+        var nicknameExists = await db.Users.AnyAsync(u => u.Id != id && u.Nickname.ToLower() == normalizedNickname.ToLower());
+        if (nicknameExists) return Results.BadRequest(new { message = "Ese apodo ya esta en uso" });
+        existing.Nickname = normalizedNickname;
+    }
     if (!string.IsNullOrEmpty(input.PasswordHash))
         existing.PasswordHash = BCrypt.Net.BCrypt.HashPassword(input.PasswordHash);
     if (!string.IsNullOrEmpty(input.Role))
@@ -326,6 +423,15 @@ app.MapGet("/api/bids", async (AppDbContext db, int page = 1, int pageSize = 10)
         .OrderByDescending(b => b.Id)
         .Skip((page - 1) * pageSize)
         .Take(pageSize)
+        .Select(b => new
+        {
+            b.Id,
+            b.ProductId,
+            b.UserId,
+            b.Amount,
+            b.CreatedAt,
+            userNickname = b.User != null ? b.User.Nickname : null
+        })
         .ToListAsync();
 
     return Results.Ok(new { items = bids, total, page, pageSize });
@@ -333,7 +439,19 @@ app.MapGet("/api/bids", async (AppDbContext db, int page = 1, int pageSize = 10)
 
 app.MapGet("/api/bids/{id:long}", async (long id, AppDbContext db) =>
 {
-    var b = await db.Bids.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+    var b = await db.Bids
+        .AsNoTracking()
+        .Where(x => x.Id == id)
+        .Select(bid => new
+        {
+            bid.Id,
+            bid.ProductId,
+            bid.UserId,
+            bid.Amount,
+            bid.CreatedAt,
+            userNickname = bid.User != null ? bid.User.Nickname : null
+        })
+        .FirstOrDefaultAsync();
     return b is null ? Results.NotFound() : Results.Ok(b);
 });
 
@@ -343,6 +461,16 @@ app.MapGet("/api/products/{productId:long}/bids", async (long productId, AppDbCo
         .AsNoTracking()
         .Where(b => b.ProductId == productId)
         .OrderByDescending(b => b.Amount)
+        .ThenByDescending(b => b.CreatedAt)
+        .Select(b => new
+        {
+            b.Id,
+            b.ProductId,
+            b.UserId,
+            b.Amount,
+            b.CreatedAt,
+            userNickname = b.User != null ? b.User.Nickname : null
+        })
         .ToListAsync();
 
     return Results.Ok(bids);
@@ -359,6 +487,10 @@ app.MapPost("/api/bids", async (Bid input, ClaimsPrincipal principal, AppDbConte
     var authenticatedUserId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
     if (authenticatedUserId is null || authenticatedUserId != input.UserId.ToString())
         return Results.Json(new { message = "Usuario no autorizado para pujar" }, statusCode: StatusCodes.Status403Forbidden);
+
+    var biddingUser = await db.Users.FirstOrDefaultAsync(u => u.Id == input.UserId);
+    if (biddingUser is null)
+        return Results.Json(new { message = "Tu sesion ya no es valida. Vuelve a iniciar sesion." }, statusCode: StatusCodes.Status401Unauthorized);
 
     var leadingBid = await db.Bids
         .AsNoTracking()
@@ -378,7 +510,7 @@ app.MapPost("/api/bids", async (Bid input, ClaimsPrincipal principal, AppDbConte
     db.Bids.Add(input);
     await db.SaveChangesAsync();
 
-    return Results.Created($"/api/bids/{input.Id}", ToBidResponse(input));
+    return Results.Created($"/api/bids/{input.Id}", ToBidResponse(input, biddingUser.Nickname));
 }).RequireAuthorization();
 
 app.MapDelete("/api/bids/{id:long}", async (long id, AppDbContext db) =>
@@ -452,6 +584,7 @@ string GenerateToken(User user)
     {
         new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
         new Claim(ClaimTypes.Email, user.Email),
+        new Claim("nickname", user.Nickname),
         new Claim(ClaimTypes.Role, user.Role),
         new Claim("is_admin", user.IsAdmin.ToString())
     };
@@ -471,16 +604,18 @@ static object ToUserResponse(User user) => new
 {
     user.Id,
     user.Email,
+    user.Nickname,
     user.Role,
     user.IsAdmin,
     user.CreatedAt
 };
 
-static object ToBidResponse(Bid bid) => new
+static object ToBidResponse(Bid bid, string? userNickname) => new
 {
     bid.Id,
     bid.ProductId,
     bid.UserId,
+    userNickname,
     bid.Amount,
     bid.CreatedAt
 };
@@ -494,6 +629,7 @@ static async Task SeedDefaultDataAsync(AppDbContext db)
         adminUser = new User
         {
             Email = "admin@admin.com",
+            Nickname = "admin",
             PasswordHash = adminPasswordHash,
             Role = "ADMIN",
             IsAdmin = true
@@ -504,6 +640,7 @@ static async Task SeedDefaultDataAsync(AppDbContext db)
     else
     {
         adminUser.PasswordHash = adminPasswordHash;
+        adminUser.Nickname = "admin";
         adminUser.IsAdmin = true;
         adminUser.Role = "ADMIN";
         await db.SaveChangesAsync();
@@ -516,6 +653,7 @@ static async Task SeedDefaultDataAsync(AppDbContext db)
         regularUser = new User
         {
             Email = "user@user.com",
+            Nickname = "user",
             PasswordHash = regularPasswordHash,
             Role = "USER",
             IsAdmin = false
@@ -526,6 +664,7 @@ static async Task SeedDefaultDataAsync(AppDbContext db)
     else
     {
         regularUser.PasswordHash = regularPasswordHash;
+        regularUser.Nickname = "user";
         regularUser.IsAdmin = false;
         regularUser.Role = "USER";
         await db.SaveChangesAsync();
@@ -647,9 +786,23 @@ static async Task SeedDefaultDataAsync(AppDbContext db)
     await db.SaveChangesAsync();
 }
 
+static string NormalizeNickname(string nickname) => nickname.Trim();
+static string? ValidateNickname(string nickname)
+{
+    if (string.IsNullOrWhiteSpace(nickname))
+        return "El apodo es obligatorio";
+    if (nickname.Length < 3)
+        return "El apodo debe tener al menos 3 caracteres";
+    if (nickname.Length > 30)
+        return "El apodo no puede superar los 30 caracteres";
+    if (!Regex.IsMatch(nickname, "^[A-Za-z0-9_-]+$"))
+        return "El apodo solo puede contener letras, numeros, guiones y guion bajo";
+    return null;
+}
+
 // === DTO CLASSES ===
 
 public record LoginRequest(string Email, string Password);
-public record RegisterRequest(string Email, string Password);
-public record CreateUserRequest(string Email, string Password, string Role, bool? IsAdmin);
-public record UpdateUserRequest(string? Email, string? PasswordHash, string? Role, bool? IsAdmin);
+public record RegisterRequest(string Email, string Password, string Nickname);
+public record CreateUserRequest(string Email, string Password, string Role, bool? IsAdmin, string Nickname);
+public record UpdateUserRequest(string? Email, string? PasswordHash, string? Role, bool? IsAdmin, string? Nickname);

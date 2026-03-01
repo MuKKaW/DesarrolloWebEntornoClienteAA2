@@ -4,6 +4,7 @@ export type ProductStatus = 'DRAFT' | 'ACTIVE' | 'ENDED'
 export interface User {
   id: number
   email: string
+  nickname: string
   role: UserRole
   isAdmin: boolean
   createdAt: string
@@ -19,6 +20,8 @@ export interface Product {
   endsAt: string
   status: ProductStatus
   createdBy: number
+  createdByNickname?: string | null
+  lastBidNickname?: string | null
   createdAt?: string
 }
 
@@ -26,6 +29,7 @@ export interface Bid {
   id: number
   productId: number
   userId: number
+  userNickname?: string | null
   amount: number
   createdAt: string
 }

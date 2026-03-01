@@ -5,12 +5,10 @@
       <slot />
     </main>
     <Footer />
-    <AuthModal />
   </div>
 </template>
 
 <script setup lang="ts">
-import AuthModal from '@/components/auth/AuthModal.vue'
 import Header from './Header.vue'
 import Footer from './Footer.vue'
 </script>

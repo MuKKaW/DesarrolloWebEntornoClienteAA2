@@ -23,8 +23,6 @@ services:
 
   # .NET API
   api:
-    image: subastas-api:local
-    pull_policy: never
     build:
       context: ./back
       dockerfile: ./Subastas.Api/Dockerfile
@@ -43,8 +41,6 @@ services:
 
   # Vue.js Frontend
   frontend:
-    image: subastas-frontend:local
-    pull_policy: never
     build:
       context: ./aa-manuel-rivera
       dockerfile: Dockerfile

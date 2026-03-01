@@ -25,11 +25,11 @@ export const useUserStore = defineStore('users', () => {
     }
   }
 
-  const create = async (email: string, password: string, role: string) => {
+  const create = async (email: string, password: string, role: string, nickname: string) => {
     loading.value = true
     error.value = null
     try {
-      const response = await api.post<User>('/users', { email, password, role, isAdmin: role === 'ADMIN' })
+      const response = await api.post<User>('/users', { email, password, role, nickname, isAdmin: role === 'ADMIN' })
       return response.data
     } catch (err: any) {
       error.value = err.response?.data?.message ?? 'Could not create user'
@@ -45,6 +45,7 @@ export const useUserStore = defineStore('users', () => {
     try {
       const mappedPayload: any = {
         email: payload.email,
+        nickname: payload.nickname,
         role: payload.role,
         isAdmin: payload.role === 'ADMIN',
       }

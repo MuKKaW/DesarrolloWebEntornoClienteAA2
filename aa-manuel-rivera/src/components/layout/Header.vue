@@ -33,12 +33,12 @@
         </el-button>
 
         <template v-if="!authStore.isAuthenticated">
-          <el-button type="primary" size="small" @click="uiStore.openAuthModal('login')">{{ $t('common.login') }}</el-button>
-          <el-button size="small" @click="uiStore.openAuthModal('register')">{{ $t('common.register') }}</el-button>
+          <el-button type="primary" size="small" @click="router.push('/login')">{{ $t('common.login') }}</el-button>
+          <el-button size="small" @click="router.push('/register')">{{ $t('common.register') }}</el-button>
         </template>
 
         <template v-else>
-          <span class="hidden text-sm text-slate-600 dark:text-slate-300 sm:inline">{{ authStore.user?.email }}</span>
+          <span class="hidden text-sm text-slate-600 dark:text-slate-300 sm:inline">{{ authStore.user?.nickname || authStore.user?.email }}</span>
           <el-button type="danger" size="small" @click="logout">{{ $t('common.logout') }}</el-button>
         </template>
       </div>

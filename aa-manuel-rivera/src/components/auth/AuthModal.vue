@@ -83,10 +83,10 @@ async function handleLogin(payload: { email: string; password: string }) {
   }
 }
 
-async function handleRegister(payload: { email: string; password: string }) {
+async function handleRegister(payload: { email: string; password: string; nickname: string }) {
   try {
     errorMessage.value = ''
-    await authStore.register(payload.email, payload.password)
+    await authStore.register(payload.email, payload.password, payload.nickname)
     uiStore.closeAuthModal()
 
     if (route.path === '/login' || route.path === '/register') {

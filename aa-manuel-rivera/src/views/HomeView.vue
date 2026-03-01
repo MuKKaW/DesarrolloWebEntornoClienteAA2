@@ -7,7 +7,7 @@
       </p>
       <div class="mt-6 flex flex-wrap gap-3">
         <router-link to="/catalog"><el-button type="primary" size="large">Explorar subastas</el-button></router-link>
-        <router-link to="/register"><el-button size="large">Crear cuenta</el-button></router-link>
+        <router-link v-if="!authStore.isAuthenticated" to="/register"><el-button size="large">Crear cuenta</el-button></router-link>
       </div>
     </div>
 
@@ -40,10 +40,12 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ProductList from '@/components/ProductList.vue'
+import { useAuthStore } from '@/stores/auth'
 import { useProductStore } from '@/stores/products'
 import type { Product } from '@/types'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const productStore = useProductStore()
 
 const featured = computed(() => productStore.items.slice(0, 3))

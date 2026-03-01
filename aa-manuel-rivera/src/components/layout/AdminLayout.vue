@@ -2,10 +2,7 @@
   <div class="flex min-h-screen flex-col bg-slate-100 dark:bg-slate-950">
     <AdminHeader />
     <div class="flex flex-1">
-      <aside
-        class="border-r border-slate-300 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-        :class="uiStore.sidebarOpen ? 'w-72' : 'w-0 overflow-hidden p-0 border-r-0'"
-      >
+      <aside class="w-72 border-r border-slate-300 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <nav class="flex flex-col gap-2">
           <router-link v-if="authStore.isAdmin" to="/admin/auctions" :class="navClass('/admin/auctions')">Subastas</router-link>
           <router-link to="/admin" :class="navClass('/admin')">Dashboard</router-link>
@@ -25,13 +22,11 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useUiStore } from '@/stores/ui'
 import AdminHeader from './AdminHeader.vue'
 import AdminFooter from './AdminFooter.vue'
 
 const route = useRoute()
 const authStore = useAuthStore()
-const uiStore = useUiStore()
 
 const navClass = (path: string) => {
   const active = route.path === path

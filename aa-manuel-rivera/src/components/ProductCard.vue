@@ -16,6 +16,11 @@
         <strong>{{ product.currentPrice.toFixed(2) }} EUR</strong>
       </div>
 
+      <div class="flex items-center justify-between text-sm">
+        <span class="text-slate-500">Ultima puja</span>
+        <strong>{{ product.lastBidNickname || 'Sin pujas' }}</strong>
+      </div>
+
       <el-button type="primary" plain class="w-full" @click="$emit('select', product)">
         {{ $t('products.view_details') }}
       </el-button>

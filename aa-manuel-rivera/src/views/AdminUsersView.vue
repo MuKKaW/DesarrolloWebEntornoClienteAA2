@@ -62,13 +62,13 @@ function openEdit(user: User) {
   dialogOpen.value = true
 }
 
-async function submitForm(values: { email: string; password?: string; role: string }) {
+async function submitForm(values: { nickname: string; email: string; password?: string; role: string }) {
   try {
     if (editing.value) {
       await userStore.update(editing.value.id, { ...values, role: values.role as any })
       ElMessage.success('Usuario actualizado')
     } else {
-      await userStore.create(values.email, values.password ?? '', values.role)
+      await userStore.create(values.email, values.password ?? '', values.role, values.nickname)
       ElMessage.success('Usuario creado')
     }
     dialogOpen.value = false
