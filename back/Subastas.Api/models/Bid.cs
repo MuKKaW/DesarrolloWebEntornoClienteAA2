@@ -10,5 +10,5 @@ public class Bid
     public User? User { get; set; }
 
     public decimal Amount { get; set; }
-    public DateTime CreatedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

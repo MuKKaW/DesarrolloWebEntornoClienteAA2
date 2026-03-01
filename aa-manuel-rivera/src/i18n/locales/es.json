@@ -1,0 +1,51 @@
+{
+  "common": {
+    "app_name": "Subastas Live",
+    "home": "Inicio",
+    "catalog": "Catalogo",
+    "admin": "Admin",
+    "login": "Entrar",
+    "register": "Registro",
+    "logout": "Salir",
+    "dark": "Oscuro",
+    "light": "Claro",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "edit": "Editar",
+    "delete": "Borrar",
+    "actions": "Acciones",
+    "back": "Volver",
+    "footer_copy": "Subastas online para usuarios y vendedores"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Contrasena",
+    "confirm_password": "Confirmar contrasena",
+    "login_title": "Iniciar sesion",
+    "register_title": "Crear cuenta",
+    "login_btn": "Entrar",
+    "register_btn": "Registrarme",
+    "no_account": "No tienes cuenta?",
+    "have_account": "Ya tienes cuenta?"
+  },
+  "products": {
+    "title": "Titulo",
+    "description": "Descripcion",
+    "start_price": "Precio inicial",
+    "current_price": "Precio actual",
+    "starts_at": "Inicio",
+    "ends_at": "Fin",
+    "status": "Estado",
+    "draft": "Borrador",
+    "active": "Activa",
+    "ended": "Finalizada",
+    "view_details": "Ver detalle"
+  },
+  "users": {
+    "role": "Rol",
+    "user": "Usuario",
+    "manager": "Manager",
+    "admin": "Administrador",
+    "created_at": "Fecha alta"
+  }
+}

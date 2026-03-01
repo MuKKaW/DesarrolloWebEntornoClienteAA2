@@ -1,4 +1,5 @@
 services:
+  # MySQL Database
   db:
     image: mysql:8.0
     container_name: subastas-mysql
@@ -13,20 +14,53 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ./db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - subastas-network
 
+  # .NET API
   api:
+    image: subastas-api:local
+    pull_policy: never
     build:
-      context: ./back/Subastas.Api
-      dockerfile: Dockerfile
+      context: ./back
+      dockerfile: ./Subastas.Api/Dockerfile
     container_name: subastas-api
     restart: unless-stopped
     environment:
-      ConnectionStrings__Default: "Server=db;Port=3306;Database=subastas;User=app;Password=app;"
-      ASPNETCORE_ENVIRONMENT: "Development"
-    depends_on:
-      - db
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__Default=Server=db;Port=3306;Database=subastas;User=app;Password=app;
     ports:
       - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - subastas-network
+
+  # Vue.js Frontend
+  frontend:
+    image: subastas-frontend:local
+    pull_policy: never
+    build:
+      context: ./aa-manuel-rivera
+      dockerfile: Dockerfile
+    container_name: subastas-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - subastas-network
 
 volumes:
   mysql_data:
+    driver: local
+
+networks:
+  subastas-network:
+    driver: bridge

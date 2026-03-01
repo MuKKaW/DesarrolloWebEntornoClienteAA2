@@ -1,0 +1,51 @@
+{
+  "common": {
+    "app_name": "Auctions Live",
+    "home": "Home",
+    "catalog": "Catalog",
+    "admin": "Admin",
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout",
+    "dark": "Dark",
+    "light": "Light",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "actions": "Actions",
+    "back": "Back",
+    "footer_copy": "Online auctions for buyers and sellers"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "confirm_password": "Confirm password",
+    "login_title": "Sign in",
+    "register_title": "Create account",
+    "login_btn": "Sign in",
+    "register_btn": "Sign up",
+    "no_account": "No account yet?",
+    "have_account": "Already registered?"
+  },
+  "products": {
+    "title": "Title",
+    "description": "Description",
+    "start_price": "Start price",
+    "current_price": "Current price",
+    "starts_at": "Starts",
+    "ends_at": "Ends",
+    "status": "Status",
+    "draft": "Draft",
+    "active": "Active",
+    "ended": "Ended",
+    "view_details": "View details"
+  },
+  "users": {
+    "role": "Role",
+    "user": "User",
+    "manager": "Manager",
+    "admin": "Administrator",
+    "created_at": "Created"
+  }
+}

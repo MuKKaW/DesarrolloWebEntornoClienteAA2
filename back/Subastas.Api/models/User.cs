@@ -6,5 +6,6 @@ public class User
     public string Email { get; set; } = "";
     public string PasswordHash { get; set; } = "";
     public string Role { get; set; } = "USER";
-    public DateTime CreatedAt { get; set; }
+    public bool IsAdmin { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

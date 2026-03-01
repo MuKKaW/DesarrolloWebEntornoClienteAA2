@@ -14,6 +14,6 @@ public class Product
 
     public User? CreatedByUser { get; set; }
 
-    public DateTime CreatedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public List<Bid> Bids { get; set; } = new();
 }
